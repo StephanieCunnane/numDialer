@@ -1,0 +1,39 @@
+2 Express apps
+   client - 3000
+   backend - 3001
+
+They've written the API that simulates making phones calls. It consists of ONE endpoint:
+     POST /call
+        our body:
+           {
+               "phone": string,
+               "webhookURL": string  (we provide, points to our backend)
+           }
+        they return:
+            {
+                "id": 2345
+            }
+
+As the call simulation progresses, their API sends updates to our webhook URL. Example format:
+    they send us a POST, body is:
+      { "id": 2345, "status": "answered" },
+
+Our frontend uses XHR polling to know about the calling status updates
+
+Their API is running on port 4830
+
+
+Frontend spec:
+   a list of all numbers and their current statuses
+   one CALL button - click once to kick everything off, then disable
+   WebSockets
+
+Our backend spec:
+   route for making calls with their API
+       
+   route that handles webhook notifications (webhookURL is "localhost:3001")
+   route to display the React app
+
+We're always dialing 3 numbers at a time till the pool is used up
+Go straight down the given list
+No DB 
