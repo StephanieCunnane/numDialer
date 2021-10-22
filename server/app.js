@@ -1,7 +1,11 @@
+const cors = require("cors");
 const express = require("express");
-const axios = require("../theirAPIServer/node_modules/axios");
+const axios = require("axios");
+
+const WebSocketServer = require("ws").Server;
 
 const app = express();
+app.use(cors());
 const PORT = process.env.PORT || 3001;
 const MAX_SIMUL_CALLS = 3;
 
@@ -27,52 +31,73 @@ let currentIndex = 0;
 
 app.post("/kickoff", (req, res, next) => {
   initCalls();
-  res.send(200);
+  res.sendStatus(200).end();
 });
 
 function callWorker() {
   let currentNum = numsToCall[currentIndex++];
-  console.log(currentNum);
-
-  // let response = axios.post("http://localhost:4830/call", {
-  //   phone: currentNum,
-  //   webhookURL: "http://localhost:3001/update",
-  // })
-
-  //let id = response.data.id
-  //callStatuses[id] = {
-  //  number: currentNum,
-  //  status: "idle",
-  //}
   return new Promise((resolve) => {
     axios
       .post("http://localhost:4830/call", {
         phone: currentNum,
         webhookURL: "http://localhost:3001/update",
       })
-      .then((response) => resolve(response.data));
+      .then((response) => {
+        callStatuses[response.data.id] = {
+          status: response.data.status,
+          currentNum,
+        };
+        resolve(response.data);
+      });
   });
 }
 
-function initCalls() {
+let firstBatch = [];
+
+async function initCalls() {
   for (let i = 0; i < MAX_SIMUL_CALLS; i++) {
-    callWorker();
+    firstBatch.push(callWorker());
+    if (i == 2) {
+      let results = await Promise.all(firstBatch);
+    }
   }
 }
 
 app.post("/update", (req, res, next) => {
-  console.log(req.body);
   const id = req.body.id;
-  const status = req.body.status;
 
+  const status = req.body.status;
   callStatuses[id].status = status;
 
-  if (status === "completed" && currentIndex <= numsToCall.length) {
-    console.log("inside the if");
-    callWorker();
+  if (status === "completed" && currentIndex < numsToCall.length) {
+    let promise = callWorker();
+    Promise.resolve(promise);
   }
 
-  res.status(200);
+  let str = JSON.stringify(callStatuses);
+
+  client.send(str);
+  console.log(callStatuses);
+  res.status(200).end();
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const server = app.listen(PORT, () =>
+  console.log(`Server running on port ${PORT}`)
+);
+
+const wss = new WebSocketServer({ noServer: true });
+
+let client;
+
+wss.on("connection", function connection(ws) {
+  ws.on("message", function incoming(message) {
+    console.log("received: %s", message);
+  });
+  client = ws;
+});
+
+server.on("upgrade", (request, socket, head) => {
+  wss.handleUpgrade(request, socket, head, (socket) => {
+    wss.emit("connection", socket, request);
+  });
+});

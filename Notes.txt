@@ -37,3 +37,12 @@ Our backend spec:
 We're always dialing 3 numbers at a time till the pool is used up
 Go straight down the given list
 No DB 
+
+
+- React is too much
+- Node http module to set up a server
+
+
+Web sockets:
+  init:
+   const socket = new WebSocket("wss://localhost:3001");
